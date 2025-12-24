@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from models import create_mask
+from embedding.utils.models import create_mask
 import time
 import pickle
 import copy

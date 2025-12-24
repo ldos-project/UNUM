@@ -3,6 +3,7 @@ Models/
 NEWDatasets/
 old-Models/
 out/
+attention*
 *.png
 *.ipynb
 Loss*

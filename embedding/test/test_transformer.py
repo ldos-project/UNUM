@@ -3,10 +3,19 @@ import pickle
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from models import Seq2SeqWithEmbeddingmodClassMultiHead
-from utils import create_mask
+from embedding.utils.models import Seq2SeqWithEmbeddingmodClassMultiHead
+from embedding.utils.utils import create_mask
 from tqdm import tqdm
 import argparse
+
+def export_legend(legend, filename="legend.pdf", expand=[-5,-5,5,5]):
+    fig  = legend.figure
+    fig.set_size_inches(5,2)
+    fig.canvas.draw()
+    bbox  = legend.get_window_extent()
+    bbox = bbox.from_extents(*(bbox.extents + np.array(expand)))
+    bbox = bbox.transformed(fig.dpi_scale_trans.inverted())
+    fig.savefig(filename,format="png",dpi=600, bbox_inches=bbox)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--load_existing', action='store_true', help='Load results from existing .pkl files')
@@ -226,31 +235,64 @@ for test_set in TEST_SETS:
             #     continue
             distances = np.clip(distances, 1e-3, None)
             plt.plot(distances, cdf, label=label)
-        plt.title(f"Feature {feat}: CDF of Absolute Value Distance ({tag})")
-        plt.xlabel("Absolute Value Distance")
-        plt.ylabel("CDF")
+        #plt.title(f"Feature {feat}: CDF of Absolute Value Distance ({tag})")
+        plt.xlabel("Absolute Value Distance", fontsize=28, weight="normal")
+        plt.ylabel("CDF", fontsize=28, weight="normal")
         plt.grid(True)
-        plt.legend()
+        plt.legend(prop={'size':20,'weight':'book'})
         plt.xscale("log")
         plt.xticks([1e-3, 1, 10, 100, 1000])
         plt.gca().set_xticklabels(['0', '1', '10', '100', '1000'])
+        
+        for tick in plt.gca().xaxis.get_major_ticks():
+            tick.label1.set_fontsize(28)
+            tick.label1.set_fontweight("normal")
+        for tick in plt.gca().yaxis.get_major_ticks():
+            tick.label1.set_fontsize(28)
+            tick.label1.set_fontweight("normal")
         plt.tight_layout()
         plt.savefig(f"fig/transformer-distance/model_cdf_value_distance_{tag}_feat{feat}.png")
-        plt.close()
-
         # Bucket index distance CDF
         plt.figure(figsize=(10, 6))
+        # sorted_keys = sorted(cdf_bucket_dist_results[feat].keys())
+        # for model_name in sorted_keys:
+        #     # distances, cdf = cdf_bucket_dist_results[feat][model_name]
+        #     label = get_clean_label(model_name)
+        #     # if not any(k in model_name for k in ["kmeans30", "kmeans100", "quantile100"]):
+        #     #     continue
+        #     plt.plot(distances, cdf, label=label)
         for model_name, (distances, cdf) in cdf_bucket_dist_results[feat].items():
             label = get_clean_label(model_name)
             # if not any(k in model_name for k in ["kmeans30", "kmeans100", "quantile100"]):
             #     continue
             plt.plot(distances, cdf, label=label)
-        plt.title(f"Feature {feat}: CDF of Bucket Index Distance ({tag})")
-        plt.xlabel("Bucket Index Distance")
-        plt.ylabel("CDF")
+        #plt.title(f"Feature {feat}: CDF of Bucket Index Distance ({tag})")
+        plt.xlabel("Bucket Index Distance",fontsize=18, weight="normal")
+        plt.ylabel("CDF", fontsize=22, weight="normal")
         plt.grid(True)
-        plt.legend()
+        plt.legend(ncol=1, prop={'size':20,'weight':'book'}, loc='center left', bbox_to_anchor=(0.445, 0.5))
+        for tick in plt.gca().xaxis.get_major_ticks():
+            tick.label1.set_fontsize(22)
+            tick.label1.set_fontweight("normal")
+        for tick in plt.gca().yaxis.get_major_ticks():
+            tick.label1.set_fontsize(22)
+            tick.label1.set_fontweight("normal")
         plt.tight_layout()
         plt.savefig(f"fig/transformer-distance/model_cdf_bucket_distance_{tag}_feat{feat}.png")
-        plt.close()
+        
+        # handles, labels = plt.gca().get_legend_handles_labels()
+        #import pdb; pdb.set_trace()
+        # fig = plt.figure(frameon=False)
+        # axe = plt.Axes(fig, [0., 0., 1., 1.])
+        # axe.set_axis_off()
+        # fig.add_axes(axe)
+        # legend = axe.legend(handles, labels, loc='upper left', ncol=3, prop={'size':22,'weight':'book'},
+        #                      frameon=True, borderaxespad=0.)
+        # plt.margins(0,0)
+        # axe.axes.xaxis.set_visible(False)
+        # axe.axes.yaxis.set_visible(False)
+        # axe.axes.xaxis.set_ticks([])
+        # axe.axes.yaxis.set_ticks([])
+        #export_legend(legend, filename=f"fig/transformer-distance/new_legend.png")
+        #plt.close('all')
 

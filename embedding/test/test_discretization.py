@@ -1,6 +1,6 @@
 import torch
 import pickle
-from models import create_mask
+from embedding.utils.models import create_mask
 import random
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader

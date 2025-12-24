@@ -1,6 +1,6 @@
 import torch
-from models import Seq2SeqWithEmbeddingmodClass, Seq2SeqWithEmbeddingmodClassMultiHead
-from utils import train_model_vocab_single, train_model_vocab_multi
+from embedding.utils.models import Seq2SeqWithEmbeddingmodClass, Seq2SeqWithEmbeddingmodClassMultiHead
+from embedding.utils.utils import train_model_vocab_single, train_model_vocab_multi
 import pickle
 import argparse
 import numpy as np

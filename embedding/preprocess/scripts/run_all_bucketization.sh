@@ -3,10 +3,10 @@
 SCRIPT="find_bucket_boundaries.py"
 
 # Quantile boundaries
-# for B in 30 50 80 100; do
-#     echo "Running quantile with $B buckets..."
-#     python $SCRIPT --method quantile --num-buckets $B
-# done
+for B in 30 50 80 100; do
+    echo "Running quantile with $B buckets..."
+    python $SCRIPT --method quantile --num-buckets $B
+done
 
 # KMeans boundaries
 for B in 30 50 80 100; do
@@ -15,5 +15,5 @@ for B in 30 50 80 100; do
 done
 
 # Histogram (no num-buckets needed)
-# echo "Running histogram..."
-# python $SCRIPT --method histogram
+echo "Running histogram..."
+python $SCRIPT --method histogram

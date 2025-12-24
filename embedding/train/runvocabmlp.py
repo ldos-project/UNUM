@@ -7,17 +7,18 @@ import torch
 import torch.nn as nn
 import pickle
 import time
-from utils import test_model_batched, test_model, weighted_mse
+import argparse
+from embedding.utils.utils import test_model_batched, test_model, weighted_mse
 
 #CONSTANTS
-# DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-DEVICE = "cpu"
+DEVICE = torch.device("cuda:4" if torch.cuda.is_available() else "cpu")
+# DEVICE = "cpu"
 print(DEVICE)
 PAD_IDX = 2
 BATCH_SIZE = 1024
-NUM_EPOCHS = 250
-CONTEXT_LENGTH = 32
-PREDICTION_LENGTH = 32
+NUM_EPOCHS = 1000
+CONTEXT_LENGTH = 10
+PREDICTION_LENGTH = 10
 
 def train_linear_model(model, dataset, optimizer, prediction_len, device, num_epochs=NUM_EPOCHS, batch_size=BATCH_SIZE, checkpoint_suffix=None):
     loss_func = torch.nn.MSELoss(reduction='sum')
@@ -53,12 +54,23 @@ def train_linear_model(model, dataset, optimizer, prediction_len, device, num_ep
     return model, loss_traj
 
 
-def train_mlp(model, dataset, optimizer, prediction_len, device, num_epochs=NUM_EPOCHS, batch_size=BATCH_SIZE, checkpoint_suffix=None):
-    loss_func = torch.nn.MSELoss(reduction='sum')
+def train_mlp(model, dataset, optimizer, prediction_len, device, num_epochs=NUM_EPOCHS, batch_size=BATCH_SIZE, checkpoint_suffix='102', vocab_dict=None, checkpoint_path=None, resume_from_epoch=0): 
+    loss_func = nn.CrossEntropyLoss()
     loss_traj = []
     model.train()
     num_batch = dataset.shape[0]//batch_size
-    for epoch in range(num_epochs):
+
+    if checkpoint_path and resume_from_epoch > 0:
+        checkpoint_file = os.path.join(checkpoint_path, "MLP-MS-Checkpoint-"+checkpoint_suffix+"-"+str(resume_from_epoch)+"iter.p")
+        if os.path.exists(checkpoint_file):
+            print(f"[info] Loading checkpoint from: {checkpoint_file}")
+            model = torch.load(checkpoint_file, map_location=device)
+            print(f"[info] Resumed training from epoch {resume_from_epoch}")
+        else:
+            print(f"[warning] Checkpoint file not found: {checkpoint_file}. Starting from scratch.")
+
+    # Training loop
+    for epoch in range(resume_from_epoch, num_epochs):
         
         epoch_loss = 0.0
         t0 = time.time()
@@ -66,12 +78,57 @@ def train_mlp(model, dataset, optimizer, prediction_len, device, num_epochs=NUM_
             input = dataset[batch*batch_size:(batch+1)*batch_size, :, :].clone()
             enc_input = input[:, :-prediction_len, :].to(device)
             enc_input = enc_input.reshape(enc_input.shape[0], enc_input.shape[1]*enc_input.shape[2])
+            # print("enc_input.shape: ", enc_input.shape)
             expected_output = input[:, -prediction_len:, :].to(device)
             model_out = model(enc_input)
             optimizer.zero_grad()
-            expected_shape = expected_output.shape[-2]*expected_output.shape[-1]
-            loss = loss_func(model_out, expected_output.reshape(expected_output.shape[0], expected_shape))
+            
+            # use tokenizer
+            # Transform expected_output to class indices
+            batch_classes = []
+            for i in range(batch_size):
+                for t in range(prediction_len):
+                    base_rtt_val = expected_output[i, t, 0]  # continuous float
+                    discrete_features = tuple(expected_output[i, t, 1:].tolist())  # 5D
+                    class_idx = vocab_dict.get(discrete_features, -1)
+
+                    # vector = tuple(expected_output[i, t, :].tolist())
+                    # class_idx = vocab_dict.get(vector, -1)  # Get class index from vocab_dict
+                    if class_idx == -1:
+                        raise ValueError(f"Vector not found in vocab_dict: {discrete_features}")
+                    batch_classes.append(class_idx)
+
+            # Convert to tensor and move to device
+            batch_classes = torch.tensor(batch_classes, dtype=torch.long).to(device)
+            batch_classes = batch_classes.view(batch_size, prediction_len)  # Reshape for batch
+
+            # Create mask for valid targets
+            # valid_mask = (expected_output[:, :, :].sum(dim=-1) != -1).to(device)  # True where not -1
+            # valid_indices = valid_mask.flatten()  # Flatten to get a 1D mask
+
+            
+            model_out = model_out.view(batch_size, prediction_len, -1)  # Reshape to [batch_size, prediction_len, num_classes]
+
+            # print("model_out.shape: ", model_out.shape)
+            # print("batch_classes.shape: ", batch_classes.shape)
+            # Calculate loss
+            loss = 0
+            for i in range(prediction_len):
+                logits = model_out[:, i, :]  # Model output for time step i
+                # print("logits.shape: ", logits.shape)
+                loss += loss_func(logits, batch_classes[:, i])  # Cross-entropy loss for step i
+                # print("logits: ", logits.shape, ", sum: ", torch.sum(logits, dim=1))
+                # print("batch_classes: ", batch_classes[:, i].shape, ", value: ", batch_classes[:, i])
+                # current_valid_mask = valid_mask[:, i].flatten()  # True for valid entries for this time step
+                # per_step_loss = loss_func(logits, batch_classes[:, i])  # Cross-entropy loss for step i
+                # Only consider losses where valid
+                # loss += per_step_loss[current_valid_mask].sum()
+
+            # Backpropagation
             loss.backward()
+
+            # loss = loss_func(model_out, expected_output.reshape(expected_output.shape[0], expected_shape))
+            # loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
         epoch_time = time.time() - t0
@@ -79,8 +136,9 @@ def train_mlp(model, dataset, optimizer, prediction_len, device, num_epochs=NUM_
         loss_traj += [epoch_loss]
         
         print(f"[info] epoch {epoch} | Time taken = {epoch_time:.1f} seconds")
-        if (epoch+1)%10 == 0:
+        if (epoch+1)%100 == 0:
             print(f"Epoch loss = {epoch_loss:.6f}")
+            torch.save(model, '/datastor1/janec/Models/MLP-MS-Checkpoint-' + checkpoint_suffix + '-'+str(epoch)+'iter.p')
         if epoch == num_epochs-1:
             print(f"Final Epoch: Loss = {epoch_loss:.6f}")
         shuffle_idx = torch.randperm(dataset.shape[0])
@@ -316,7 +374,6 @@ class NLinear(nn.Module):
         x = x + seq_last
         return x # [Batch, Output length, Channel]
 
-
 class MLP(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_dim=512) -> None:
         super(MLP, self).__init__()
@@ -325,33 +382,49 @@ class MLP(nn.Module):
         self.hidden_dim = hidden_dim
 
         if hidden_dim is not None: 
-            self.mlp = nn.Sequential(nn.Linear(input_dim, hidden_dim),
-                                  nn.ReLU(),
-                                  nn.Linear(hidden_dim, hidden_dim),
-                                  nn.ReLU(),
-                                  nn.Linear(hidden_dim, output_dim))
+            self.mlp = nn.Sequential(
+                nn.Linear(input_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, output_dim),
+                nn.Softmax(dim=1)  # Softmax layer added here
+            )
         else:
-            self.mlp = nn.Sequential(nn.Linear(input_dim, output_dim), nn.ReLU())
+            self.mlp = nn.Sequential(
+                nn.Linear(input_dim, output_dim), 
+                nn.ReLU(),
+                nn.Softmax(dim=1)  # Softmax layer added here
+            )
+    
     def forward(self, x):
+        x = x.float()
         x = self.mlp(x)
         return x
 
-INPUT_DIM = int(sys.argv[1])
-COLUMN_INDEX = int(sys.argv[2])
-selected_indices = [0, 1, 4, 6, 8, 12]
-with open('./NEWDatasets/FullDataset-new-train.p', 'rb') as f:
-    train_dataset = pickle.load(f)
-    train_dataset = train_dataset[:, :, selected_indices]
-    if INPUT_DIM == 1:
-        train_dataset = train_dataset[:, :, COLUMN_INDEX].unsqueeze(-1)
-model = MLP(input_dim=CONTEXT_LENGTH*INPUT_DIM, output_dim=CONTEXT_LENGTH*INPUT_DIM, hidden_dim=102).to(DEVICE)
+parser = argparse.ArgumentParser(description="Train an MLP model with a configurable hidden dimension.")
+parser.add_argument('--hidden_dim', type=int, default=102, 
+                    help='Hidden dimension size for the MLP. Defaults to 102.')
+parser.add_argument('--checkpoint_path', type=str, help="Path to save/load model checkpoints")
+parser.add_argument('--resume_from_epoch', type=int, default=0, help="Epoch to resume training from (if applicable)")
+    
+args = parser.parse_args()
+
+with open('NEWDatasets/combined-dataset-preprocessed/6col-VocabDict.p', 'rb') as f_vocab:
+        vocab_dict = pickle.load(f_vocab)
+        num_classes = len(vocab_dict)
+        print("vocab dict size: ", num_classes)
+
+with open('NEWDatasets/combined-dataset-preprocessed/6col-rtt-based-train.p', 'rb') as f:
+    train_dataset_np = pickle.load(f)
+    train_dataset = torch.from_numpy(train_dataset_np)
+model = MLP(input_dim=CONTEXT_LENGTH*train_dataset.shape[-1], output_dim=CONTEXT_LENGTH*num_classes, hidden_dim=args.hidden_dim).to(DEVICE)
+print("input dim: ", CONTEXT_LENGTH*train_dataset.shape[-1])
 print(sum(p.numel() for p in model.parameters() if p.requires_grad))
 train_dataset = train_dataset.to(DEVICE)
+save_name = 'MLP-MS-norm-{}dim-noweighting-vocab'.format(args.hidden_dim)
 
 opt = torch.optim.Adam(model.parameters(), lr=1e-4)
-trained_model, loss_traj = train_mlp(model, train_dataset, opt, PREDICTION_LENGTH, DEVICE, 1000, BATCH_SIZE)
+trained_model, loss_traj = train_mlp(model, train_dataset, opt, PREDICTION_LENGTH, DEVICE, 1000, BATCH_SIZE, checkpoint_suffix=str(args.hidden_dim), vocab_dict=vocab_dict, checkpoint_path=args.checkpoint_path, resume_from_epoch=args.resume_from_epoch)
 
-if INPUT_DIM == 1:
-    torch.save(trained_model, './Models/MLP-norm-408dim-noweighting-1000iter-'+str(COLUMN_INDEX)+'.p')
-else:
-    torch.save(trained_model, './Models/MLP-norm-408dim-noweighting-selected-0, 1, 4, 5, 8, 12-1000iter.p')
+torch.save(trained_model, '/datastor1/janec/Models/{}-1000iter.p'.format(save_name))

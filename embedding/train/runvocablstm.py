@@ -8,7 +8,7 @@ import torch.nn as nn
 import pickle
 import time
 import argparse
-from utils import test_model_batched, test_model, weighted_mse
+from embedding.utils.utils import test_model_batched, test_model, weighted_mse
 
 #CONSTANTS
 DEVICE = torch.device("cuda:4" if torch.cuda.is_available() else "cpu")
