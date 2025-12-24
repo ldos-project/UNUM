@@ -10,3 +10,5 @@ Loss*
 *.p
 *.csv
 *.pkl
+*.png
+*.pdf
