@@ -5,8 +5,6 @@ Unum is a new framework powered by a unified network state embedder leveraging T
 
 This repository provides code for Unum embedding training (`embedding/`) and sample integrations with two representative downstream controllers: congestion control (`controller-examples/cc/`) and adaptive bitrate selection (`controller-examples/abr/`). Additional details and evaluation results can be found in our NSDI'26 paper `UNUM: A New Framework for Network Control`.
 
-For step-by-step artifact evaluation instructions, please see [ARTIFACT_EVALUATION](ARTIFACT_EVALUATION.md).
-
 ## Unum Network State Embedding
 
 
