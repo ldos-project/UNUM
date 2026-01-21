@@ -1,6 +1,8 @@
 [submodule "controller-examples/abr"]
 	path = controller-examples/abr
 	url = git@github.com:Janecjy/Genet.git
+	branch = main
 [submodule "controller-examples/cc"]
 	path = controller-examples/cc
 	url = git@github.com:debajit15kgp/Unum.git
+	branch = main
