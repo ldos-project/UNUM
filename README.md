@@ -1,9 +1,30 @@
 
 # UNUM
 
-Unum is a new framework powered by a unified network state embedder leveraging Transformers’ self-attention mechanism and diverse training datasets to learn rich, latent state representations. A core design goal of Unum is to decouple state estimation into a standalone, first-class entity in network control, and improve the state estimation quality. 
+Unum is a new framework powered by a unified network state embedder leveraging Transformers' self-attention mechanism and diverse training datasets to learn rich, latent state representations. A core design goal of Unum is to decouple state estimation into a standalone, first-class entity in network control, and improve the state estimation quality. 
 
 This repository provides code for Unum embedding training (`embedding/`) and sample integrations with two representative downstream controllers: congestion control (`controller-examples/cc/`) and adaptive bitrate selection (`controller-examples/abr/`). Additional details and evaluation results can be found in our NSDI'26 paper `UNUM: A New Framework for Network Control`.
+
+## Artifact Evaluation
+
+1. **Clone the repository with submodules:**
+   ```bash
+   git clone --recursive git@github.com:ldos-project/UNUM.git
+   cd UNUM
+   
+   # Or if already cloned, update submodules:
+   git submodule update --init --recursive
+   ```
+
+2. **Choose your use case:**
+
+   **Option A: Congestion Control Integration**
+   - See `controller-examples/cc/README.md` for detailed setup
+   - Requires 16-node CloudLab cluster
+   
+   **Option B: ABR Integration**
+   - See `controller-examples/abr/README.md` for detailed setup  
+   - Supports single-server quick evaluation mode
 
 ## Unum Network State Embedding
 
