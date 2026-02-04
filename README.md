@@ -9,7 +9,7 @@ This repository provides code for Unum embedding training (`embedding/`) and sam
 
 1. **Clone the repository with submodules:**
    ```bash
-   git clone --recursive git@github.com:ldos-project/UNUM.git
+   git clone --recursive https://github.com/ldos-project/UNUM.git
    cd UNUM
    
    # Or if already cloned, update submodules:
